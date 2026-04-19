@@ -9,11 +9,14 @@ const state = {
   meals: loadJson(STORAGE_KEYS.meals, {}),
   shoppingItems: loadShoppingItems(),
   editing: null,
+  holidaysByDate: loadJson("meal-planner-v5-holidays-cache", {}),
+  holidaySource: "読み込み中",
 };
 
 const weekRangeEl = document.getElementById("weekRange");
 const plannerBodyEl = document.getElementById("plannerBody");
 const shoppingBoxEl = document.getElementById("shoppingBox");
+const holidaySourceBadgeEl = document.getElementById("holidaySourceBadge");
 
 const modalEl = document.getElementById("editorModal");
 const editorTitleEl = document.getElementById("editorTitle");
@@ -28,19 +31,19 @@ const shoppingItemInputEl = document.getElementById("shoppingItemInput");
 const shoppingAddBtn = document.getElementById("shoppingAddBtn");
 const shoppingCloseBtn = document.getElementById("shoppingCloseBtn");
 
-document.getElementById("prevWeekBtn").addEventListener("click", () => {
+document.getElementById("prevWeekBtn").addEventListener("click", async () => {
   state.currentWeekStart = addDays(state.currentWeekStart, -7);
-  render();
+  await render();
 });
 
-document.getElementById("nextWeekBtn").addEventListener("click", () => {
+document.getElementById("nextWeekBtn").addEventListener("click", async () => {
   state.currentWeekStart = addDays(state.currentWeekStart, 7);
-  render();
+  await render();
 });
 
-document.getElementById("thisWeekBtn").addEventListener("click", () => {
+document.getElementById("thisWeekBtn").addEventListener("click", async () => {
   state.currentWeekStart = getStartOfWeek(new Date());
-  render();
+  await render();
 });
 
 shoppingBoxEl.addEventListener("click", openShoppingModal);
@@ -67,13 +70,8 @@ cancelBtn.addEventListener("click", closeEditor);
 saveBtn.addEventListener("click", () => {
   if (!state.editing) return;
   const value = editorTextareaEl.value.trim();
-
-  if (value) {
-    state.meals[state.editing.key] = value;
-  } else {
-    delete state.meals[state.editing.key];
-  }
-
+  if (value) state.meals[state.editing.key] = value;
+  else delete state.meals[state.editing.key];
   saveMeals();
   closeEditor();
   render();
@@ -83,13 +81,8 @@ document.addEventListener("click", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
 
-  if (target.dataset.close === "true") {
-    closeEditor();
-  }
-
-  if (target.dataset.close === "shopping") {
-    closeShoppingModal();
-  }
+  if (target.dataset.close === "true") closeEditor();
+  if (target.dataset.close === "shopping") closeShoppingModal();
 
   if (target.matches(".delete-item-btn")) {
     const index = Number(target.dataset.index);
@@ -100,7 +93,6 @@ document.addEventListener("click", (event) => {
 document.addEventListener("change", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
-
   if (target.matches(".shopping-check")) {
     const index = Number(target.dataset.index);
     toggleShoppingItem(index, target.checked);
@@ -122,11 +114,13 @@ if ("serviceWorker" in navigator) {
 
 render();
 
-function render() {
+async function render() {
   renderWeekRange();
   renderShoppingPreview();
+  await ensureHolidayDataForVisibleRange();
   renderPlanner();
   renderShoppingItemsList();
+  holidaySourceBadgeEl.textContent = `祝日: ${state.holidaySource}`;
 }
 
 function renderWeekRange() {
@@ -137,9 +131,7 @@ function renderWeekRange() {
 
 function renderShoppingPreview() {
   if (state.shoppingItems.length) {
-    shoppingBoxEl.textContent = state.shoppingItems
-      .map((item) => item.name)
-      .join("、");
+    shoppingBoxEl.textContent = state.shoppingItems.map((item) => item.name).join("、");
     shoppingBoxEl.classList.remove("empty");
   } else {
     shoppingBoxEl.textContent = "タップして買い物リストを追加";
@@ -153,8 +145,7 @@ function renderShoppingItemsList() {
   if (!state.shoppingItems.length) {
     const empty = document.createElement("div");
     empty.className = "shopping-empty";
-    empty.textContent =
-      "まだアイテムがありません。上の入力欄から追加してください。";
+    empty.textContent = "まだアイテムがありません。上の入力欄から追加してください。";
     shoppingItemsListEl.appendChild(empty);
     return;
   }
@@ -185,9 +176,7 @@ function renderShoppingItemsList() {
 
     const name = document.createElement("div");
     name.className = "shopping-item-name";
-    if (item.checked) {
-      name.classList.add("checked");
-    }
+    if (item.checked) name.classList.add("checked");
     name.textContent = item.name;
 
     const deleteButton = document.createElement("button");
@@ -204,37 +193,29 @@ function renderShoppingItemsList() {
 
 function renderPlanner() {
   plannerBodyEl.innerHTML = "";
-
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
   for (let i = 0; i < 7; i += 1) {
     const date = addDays(state.currentWeekStart, i);
     const iso = toISODate(date);
-    const holidayName = getJapaneseHolidayName(date);
+    const holidayName = state.holidaysByDate[iso] || "";
 
     const row = document.createElement("div");
     row.className = "day-row";
-
-    const targetDate = new Date(
-      date.getFullYear(),
-      date.getMonth(),
-      date.getDate(),
-    );
-    const isToday = targetDate.getTime() === today.getTime();
 
     const day = date.getDay();
     if (day === 0) row.classList.add("sunday");
     else if (day === 6) row.classList.add("saturday");
     if (holidayName) row.classList.add("holiday");
-    if (isToday) row.classList.add("today");
+
+    const targetDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    if (targetDate.getTime() === todayMidnight.getTime()) row.classList.add("today");
 
     const dayLabel = document.createElement("div");
     dayLabel.className = "day-label";
     dayLabel.textContent = `${date.getMonth() + 1}/${date.getDate()}(${DAYS_JA[day]})`;
-    if (holidayName) {
-      dayLabel.title = holidayName;
-    }
+    if (holidayName) dayLabel.title = holidayName;
 
     const lunchBtn = createMemoButton({
       key: `${iso}-lunch`,
@@ -253,26 +234,50 @@ function renderPlanner() {
   }
 }
 
+async function ensureHolidayDataForVisibleRange() {
+  const start = state.currentWeekStart;
+  const end = addDays(start, 6);
+  const years = new Set([start.getFullYear(), end.getFullYear()]);
+  const missing = [...years].find((year) => !Object.keys(state.holidaysByDate).some((d) => d.startsWith(`${year}-`)));
+
+  if (!missing) {
+    if (state.holidaySource === "読み込み中") state.holidaySource = "キャッシュ";
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/holidays?start=${toISODate(start)}&end=${toISODate(end)}`, { cache: "no-store" });
+    if (!response.ok) throw new Error("holiday fetch failed");
+    const payload = await response.json();
+
+    if (payload && payload.holidays && typeof payload.holidays === "object") {
+      state.holidaysByDate = { ...state.holidaysByDate, ...payload.holidays };
+      localStorage.setItem("meal-planner-v5-holidays-cache", JSON.stringify(state.holidaysByDate));
+      state.holidaySource = payload.source || "API";
+      return;
+    }
+
+    throw new Error("invalid payload");
+  } catch (error) {
+    console.error(error);
+    state.holidaySource = "取得失敗";
+  }
+}
+
 function createMemoButton({ key, label, value }) {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "memo-box tappable";
   button.setAttribute("aria-label", `${label}を編集`);
 
-  if (value) {
-    button.textContent = value;
-  } else {
+  if (value) button.textContent = value;
+  else {
     button.textContent = "タップして入力";
     button.classList.add("empty");
   }
 
   button.addEventListener("click", () => {
-    openEditor({
-      key,
-      title: `${label}を編集`,
-      value,
-      placeholder: "ここに献立を入力",
-    });
+    openEditor({ key, title: `${label}を編集`, value, placeholder: "ここに献立を入力" });
   });
 
   return button;
@@ -310,7 +315,6 @@ function closeShoppingModal() {
 function addShoppingItem() {
   const value = shoppingItemInputEl.value.trim();
   if (!value) return;
-
   state.shoppingItems.push({ name: value, checked: false });
   saveShoppingItems();
   shoppingItemInputEl.value = "";
@@ -320,8 +324,7 @@ function addShoppingItem() {
 }
 
 function removeShoppingItem(index) {
-  if (Number.isNaN(index) || index < 0 || index >= state.shoppingItems.length)
-    return;
+  if (Number.isNaN(index) || index < 0 || index >= state.shoppingItems.length) return;
   state.shoppingItems.splice(index, 1);
   saveShoppingItems();
   renderShoppingPreview();
@@ -329,8 +332,7 @@ function removeShoppingItem(index) {
 }
 
 function toggleShoppingItem(index, checked) {
-  if (Number.isNaN(index) || index < 0 || index >= state.shoppingItems.length)
-    return;
+  if (Number.isNaN(index) || index < 0 || index >= state.shoppingItems.length) return;
   state.shoppingItems[index].checked = checked;
   saveShoppingItems();
   renderShoppingPreview();
@@ -358,17 +360,8 @@ function handleDrop(event) {
   const fromIndex = Number(event.dataTransfer.getData("text/plain"));
   const toIndex = Number(toRow.dataset.index);
 
-  if (
-    Number.isNaN(fromIndex) ||
-    Number.isNaN(toIndex) ||
-    fromIndex === toIndex ||
-    fromIndex < 0 ||
-    toIndex < 0 ||
-    fromIndex >= state.shoppingItems.length ||
-    toIndex >= state.shoppingItems.length
-  ) {
-    return;
-  }
+  if (Number.isNaN(fromIndex) || Number.isNaN(toIndex) || fromIndex === toIndex) return;
+  if (fromIndex < 0 || toIndex < 0 || fromIndex >= state.shoppingItems.length || toIndex >= state.shoppingItems.length) return;
 
   const [moved] = state.shoppingItems.splice(fromIndex, 1);
   state.shoppingItems.splice(toIndex, 0, moved);
@@ -380,9 +373,7 @@ function handleDrop(event) {
 
 function handleDragEnd(event) {
   const row = event.currentTarget;
-  if (row instanceof HTMLElement) {
-    row.classList.remove("dragging");
-  }
+  if (row instanceof HTMLElement) row.classList.remove("dragging");
 }
 
 function saveMeals() {
@@ -390,10 +381,7 @@ function saveMeals() {
 }
 
 function saveShoppingItems() {
-  localStorage.setItem(
-    STORAGE_KEYS.shopping,
-    JSON.stringify(state.shoppingItems),
-  );
+  localStorage.setItem(STORAGE_KEYS.shopping, JSON.stringify(state.shoppingItems));
 }
 
 function loadJson(key, fallbackValue) {
@@ -407,37 +395,16 @@ function loadJson(key, fallbackValue) {
 
 function loadShoppingItems() {
   try {
-    const current = localStorage.getItem(STORAGE_KEYS.shopping);
-    if (current) {
-      const parsed = JSON.parse(current);
-      if (Array.isArray(parsed)) {
-        return parsed.map(normalizeShoppingItem).filter(Boolean);
-      }
-    }
-
-    const v3 = localStorage.getItem("meal-planner-v3-shopping-items");
-    if (v3) {
-      const parsed = JSON.parse(v3);
-      if (Array.isArray(parsed)) {
-        return parsed.map(normalizeShoppingItem).filter(Boolean);
-      }
-    }
-
-    const v2 = localStorage.getItem("meal-planner-v2-shopping-items");
-    if (v2) {
-      const parsed = JSON.parse(v2);
-      if (Array.isArray(parsed)) {
-        return parsed.map(normalizeShoppingItem).filter(Boolean);
-      }
+    for (const key of [STORAGE_KEYS.shopping, "meal-planner-v3-shopping-items", "meal-planner-v2-shopping-items"]) {
+      const value = localStorage.getItem(key);
+      if (!value) continue;
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed.map(normalizeShoppingItem).filter(Boolean);
     }
 
     const oldText = localStorage.getItem("meal-planner-v1-shopping");
     if (oldText && oldText.trim()) {
-      return oldText
-        .split(/[、,\n]/)
-        .map((item) => item.trim())
-        .filter(Boolean)
-        .map((name) => ({ name, checked: false }));
+      return oldText.split(/[、,\n]/).map((item) => item.trim()).filter(Boolean).map((name) => ({ name, checked: false }));
     }
 
     return [];
@@ -459,132 +426,9 @@ function normalizeShoppingItem(item) {
   return null;
 }
 
-// 日本の祝日判定
-// 固定日、ハッピーマンデー、春分・秋分の近似式、振替休日、国民の休日に対応。
-// 春分日・秋分日が官報で毎年確定することを踏まえた近似計算を使っています。
-function getJapaneseHolidayName(date) {
-  const normalized = new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-  );
-  const base = getBaseHolidayName(normalized);
-  if (base) return base;
-
-  if (isSubstituteHoliday(normalized)) return "振替休日";
-  if (isCitizenHoliday(normalized)) return "国民の休日";
-  return "";
-}
-
-function getBaseHolidayName(date) {
-  const y = date.getFullYear();
-  const m = date.getMonth() + 1;
-  const d = date.getDate();
-  const w = date.getDay();
-
-  if (m === 1 && d === 1) return "元日";
-  if (m === 1 && isNthMonday(date, 2)) return "成人の日";
-  if (m === 2 && d === 11) return "建国記念の日";
-  if (m === 2 && d === 23 && y >= 2020) return "天皇誕生日";
-
-  if (m === 3 && d === calcSpringEquinoxDay(y)) return "春分の日";
-  if (m === 4 && d === 29) return "昭和の日";
-  if (m === 5 && d === 3) return "憲法記念日";
-  if (m === 5 && d === 4) return "みどりの日";
-  if (m === 5 && d === 5) return "こどもの日";
-
-  if (m === 7 && isNthMonday(date, 3)) return "海の日";
-  if (m === 8 && d === 11) return "山の日";
-  if (m === 9 && isNthMonday(date, 3)) return "敬老の日";
-  if (m === 9 && d === calcAutumnEquinoxDay(y)) return "秋分の日";
-  if (m === 10 && isNthMonday(date, 2)) return "スポーツの日";
-  if (m === 11 && d === 3) return "文化の日";
-  if (m === 11 && d === 23) return "勤労感謝の日";
-
-  return "";
-}
-
-function isSubstituteHoliday(date) {
-  if (date.getDay() === 0) return false;
-
-  const prev = addDays(date, -1);
-  if (prev.getDay() === 0 && getBaseHolidayName(prev)) return true;
-
-  if (date >= new Date(2007, 0, 1)) {
-    let cursor = addDays(date, -1);
-    let foundHoliday = false;
-
-    while (cursor.getDay() !== 0) {
-      if (getBaseHolidayName(cursor)) {
-        foundHoliday = true;
-        cursor = addDays(cursor, -1);
-      } else {
-        return false;
-      }
-    }
-
-    return foundHoliday && getBaseHolidayName(cursor) !== "";
-  }
-
-  return false;
-}
-
-function isCitizenHoliday(date) {
-  if (date < new Date(1985, 11, 27)) return false;
-  if (date.getDay() === 0) return false;
-  if (getBaseHolidayName(date)) return false;
-  if (isSubstituteHoliday(date)) return false;
-
-  const prev = addDays(date, -1);
-  const next = addDays(date, 1);
-
-  const prevHoliday =
-    getBaseHolidayName(prev) ||
-    isSubstituteHoliday(prev) ||
-    isCitizenHolidaySimple(prev);
-  const nextHoliday =
-    getBaseHolidayName(next) ||
-    isSubstituteHoliday(next) ||
-    isCitizenHolidaySimple(next);
-
-  return !!prevHoliday && !!nextHoliday;
-}
-
-function isCitizenHolidaySimple(date) {
-  if (date < new Date(1985, 11, 27)) return false;
-  if (date.getDay() === 0) return false;
-  if (getBaseHolidayName(date)) return false;
-  const prev = addDays(date, -1);
-  const next = addDays(date, 1);
-  return !!getBaseHolidayName(prev) && !!getBaseHolidayName(next);
-}
-
-function isNthMonday(date, nth) {
-  return date.getDay() === 1 && Math.ceil(date.getDate() / 7) === nth;
-}
-
-function calcSpringEquinoxDay(year) {
-  if (year <= 2099) {
-    return Math.floor(
-      20.8431 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4),
-    );
-  }
-  return 20;
-}
-
-function calcAutumnEquinoxDay(year) {
-  if (year <= 2099) {
-    return Math.floor(
-      23.2488 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4),
-    );
-  }
-  return 23;
-}
-
 function getStartOfWeek(date) {
   const copy = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const diff = copy.getDay();
-  copy.setDate(copy.getDate() - diff);
+  copy.setDate(copy.getDate() - copy.getDay());
   copy.setHours(0, 0, 0, 0);
   return copy;
 }
