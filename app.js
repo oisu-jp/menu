@@ -205,6 +205,9 @@ function renderShoppingItemsList() {
 function renderPlanner() {
   plannerBodyEl.innerHTML = "";
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
   for (let i = 0; i < 7; i += 1) {
     const date = addDays(state.currentWeekStart, i);
     const iso = toISODate(date);
@@ -212,20 +215,19 @@ function renderPlanner() {
 
     const row = document.createElement("div");
     row.className = "day-row";
-    const today = new Date();
-    const isToday =
-      date.getFullYear() === today.getFullYear() &&
-      date.getMonth() === today.getMonth() &&
-      date.getDate() === today.getDate();
 
-    if (isToday) {
-      row.classList.add("today");
-    }
+    const targetDate = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+    );
+    const isToday = targetDate.getTime() === today.getTime();
 
     const day = date.getDay();
     if (day === 0) row.classList.add("sunday");
     else if (day === 6) row.classList.add("saturday");
     if (holidayName) row.classList.add("holiday");
+    if (isToday) row.classList.add("today");
 
     const dayLabel = document.createElement("div");
     dayLabel.className = "day-label";
