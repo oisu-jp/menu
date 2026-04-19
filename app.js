@@ -137,7 +137,9 @@ function renderWeekRange() {
 
 function renderShoppingPreview() {
   if (state.shoppingItems.length) {
-    shoppingBoxEl.textContent = state.shoppingItems.map((item) => item.name).join("、");
+    shoppingBoxEl.textContent = state.shoppingItems
+      .map((item) => item.name)
+      .join("、");
     shoppingBoxEl.classList.remove("empty");
   } else {
     shoppingBoxEl.textContent = "タップして買い物リストを追加";
@@ -151,7 +153,8 @@ function renderShoppingItemsList() {
   if (!state.shoppingItems.length) {
     const empty = document.createElement("div");
     empty.className = "shopping-empty";
-    empty.textContent = "まだアイテムがありません。上の入力欄から追加してください。";
+    empty.textContent =
+      "まだアイテムがありません。上の入力欄から追加してください。";
     shoppingItemsListEl.appendChild(empty);
     return;
   }
@@ -209,6 +212,15 @@ function renderPlanner() {
 
     const row = document.createElement("div");
     row.className = "day-row";
+    const today = new Date();
+    const isToday =
+      date.getFullYear() === today.getFullYear() &&
+      date.getMonth() === today.getMonth() &&
+      date.getDate() === today.getDate();
+
+    if (isToday) {
+      row.classList.add("today");
+    }
 
     const day = date.getDay();
     if (day === 0) row.classList.add("sunday");
@@ -306,7 +318,8 @@ function addShoppingItem() {
 }
 
 function removeShoppingItem(index) {
-  if (Number.isNaN(index) || index < 0 || index >= state.shoppingItems.length) return;
+  if (Number.isNaN(index) || index < 0 || index >= state.shoppingItems.length)
+    return;
   state.shoppingItems.splice(index, 1);
   saveShoppingItems();
   renderShoppingPreview();
@@ -314,7 +327,8 @@ function removeShoppingItem(index) {
 }
 
 function toggleShoppingItem(index, checked) {
-  if (Number.isNaN(index) || index < 0 || index >= state.shoppingItems.length) return;
+  if (Number.isNaN(index) || index < 0 || index >= state.shoppingItems.length)
+    return;
   state.shoppingItems[index].checked = checked;
   saveShoppingItems();
   renderShoppingPreview();
@@ -374,7 +388,10 @@ function saveMeals() {
 }
 
 function saveShoppingItems() {
-  localStorage.setItem(STORAGE_KEYS.shopping, JSON.stringify(state.shoppingItems));
+  localStorage.setItem(
+    STORAGE_KEYS.shopping,
+    JSON.stringify(state.shoppingItems),
+  );
 }
 
 function loadJson(key, fallbackValue) {
@@ -444,7 +461,11 @@ function normalizeShoppingItem(item) {
 // 固定日、ハッピーマンデー、春分・秋分の近似式、振替休日、国民の休日に対応。
 // 春分日・秋分日が官報で毎年確定することを踏まえた近似計算を使っています。
 function getJapaneseHolidayName(date) {
-  const normalized = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const normalized = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+  );
   const base = getBaseHolidayName(normalized);
   if (base) return base;
 
@@ -515,8 +536,14 @@ function isCitizenHoliday(date) {
   const prev = addDays(date, -1);
   const next = addDays(date, 1);
 
-  const prevHoliday = getBaseHolidayName(prev) || isSubstituteHoliday(prev) || isCitizenHolidaySimple(prev);
-  const nextHoliday = getBaseHolidayName(next) || isSubstituteHoliday(next) || isCitizenHolidaySimple(next);
+  const prevHoliday =
+    getBaseHolidayName(prev) ||
+    isSubstituteHoliday(prev) ||
+    isCitizenHolidaySimple(prev);
+  const nextHoliday =
+    getBaseHolidayName(next) ||
+    isSubstituteHoliday(next) ||
+    isCitizenHolidaySimple(next);
 
   return !!prevHoliday && !!nextHoliday;
 }
@@ -536,14 +563,18 @@ function isNthMonday(date, nth) {
 
 function calcSpringEquinoxDay(year) {
   if (year <= 2099) {
-    return Math.floor(20.8431 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4));
+    return Math.floor(
+      20.8431 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4),
+    );
   }
   return 20;
 }
 
 function calcAutumnEquinoxDay(year) {
   if (year <= 2099) {
-    return Math.floor(23.2488 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4));
+    return Math.floor(
+      23.2488 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4),
+    );
   }
   return 23;
 }

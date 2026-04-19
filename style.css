@@ -3,12 +3,12 @@
 }
 
 :root {
-  --bg: #C8E1F2;
-  --paper: #FFF6DB;
+  --bg: #c8e1f2;
+  --paper: #fff6db;
   --ink: #4f5a61;
   --ink-strong: #616b72;
   --muted: #8f9aa0;
-  --accent: #ABB1B4;
+  --accent: #abb1b4;
   --line: #9fa8ad;
   --shadow: 0 10px 28px rgba(85, 98, 110, 0.12);
   --holiday-red: #d97373;
@@ -17,19 +17,23 @@
   --white: #ffffff;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
   background: linear-gradient(180deg, #e8f3fb 0%, var(--bg) 100%);
   color: var(--ink);
-  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
 }
 
 body {
   min-height: 100vh;
 }
 
-button, textarea, input {
+button,
+textarea,
+input {
   font: inherit;
   color: inherit;
 }
@@ -62,7 +66,7 @@ button, textarea, input {
 .primary-btn,
 .secondary-btn {
   border: 2px solid var(--line);
-  background: rgba(255,255,255,0.78);
+  background: rgba(255, 255, 255, 0.78);
   border-radius: 999px;
   box-shadow: var(--shadow);
 }
@@ -173,7 +177,7 @@ button, textarea, input {
   min-height: 92px;
   border: 3px solid var(--accent);
   border-radius: 16px;
-  background: rgba(255,255,255,0.82);
+  background: rgba(255, 255, 255, 0.82);
   text-align: left;
   padding: 12px;
   white-space: pre-wrap;
@@ -325,7 +329,7 @@ button, textarea, input {
   grid-template-columns: auto auto 1fr auto;
   gap: 12px;
   align-items: center;
-  background: rgba(255,255,255,0.88);
+  background: rgba(255, 255, 255, 0.88);
   border: 2px solid #e3e8ea;
   border-radius: 18px;
   padding: 14px 16px;
@@ -383,7 +387,7 @@ button, textarea, input {
   border-radius: 18px;
   padding: 18px;
   color: var(--muted);
-  background: rgba(255,255,255,0.88);
+  background: rgba(255, 255, 255, 0.88);
 }
 
 @media (max-width: 640px) {
@@ -450,4 +454,20 @@ button, textarea, input {
   .drag-handle {
     font-size: 1.2rem;
   }
+}
+
+/* 今日の強調 */
+.day-row.today .day-label {
+  font-weight: 900;
+  color: #4f5a61;
+}
+
+.day-row.today .memo-box {
+  border-width: 4px;
+  background: rgba(255, 246, 219, 0.9);
+}
+
+/* さらに目立たせたい場合（オプション） */
+.day-row.today {
+  transform: scale(1.01);
 }
