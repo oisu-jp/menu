@@ -211,13 +211,6 @@ input {
     0 10px 28px rgba(85, 98, 110, 0.12);
 }
 
-.day-row.today .day-label::after {
-  content: " 今日";
-  font-size: 0.82rem;
-  font-weight: 800;
-  margin-left: 4px;
-}
-
 .tappable {
   cursor: pointer;
 }
